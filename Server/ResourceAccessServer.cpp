@@ -39,22 +39,6 @@ void ResourceAccessServer::GetNetworkResourceInformations() {
 	}
 }
 
-void ResourceAccessServer::GetServiceInformations() {
-	const std::string LoadTargets = this->conf.GetString("services", "target", "");
-	if (LoadTargets.empty()) return;
-	ServiceMonitor::InitStatusList(this->conf);
-	ServiceMonitor::InitServiceTypeList(this->conf);
-	const std::vector<std::string> NameList = SplitString(LoadTargets, ',');
-	for (const auto& i : NameList) {
-		try {
-			this->services.emplace_back(this->SCM, i);
-		}
-		catch (std::exception&) { // ないサービスの時にエラー起こすのでここでcatch
-
-		}
-	}
-}
-
 std::string ResourceAccessServer::GetConfStr(const std::string& Section, const std::string& Key, const std::string& Default) { return this->conf.GetString(Section, Key, Default); };
 
 std::wstring ResourceAccessServer::GetConfStr(const std::wstring& Section, const std::wstring& Key, const std::wstring& Default) { return this->conf.GetString(Section, Key, Default); };
@@ -77,7 +61,6 @@ picojson::object ResourceAccessServer::AllResourceToObject() const {
 	obj.insert("memory", this->memory.Get());
 	InsertArray(this->disk, obj, "disk");
 	InsertArray(this->network, obj, "network");
-	InsertArray(this->services, obj, "service");
 	return obj;
 }
 
@@ -109,16 +92,11 @@ picojson::object ResourceAccessServer::AllDiskResourceToObject() const {
 }
 
 
-picojson::object ResourceAccessServer::AllServiceToObject() const {
-	return AllResourceToObjectImpl(this->services, "service");
-}
-
 void ResourceAccessServer::UpdateResources() {
 	this->processor.Update();
 	this->query.Update();
 	this->memory.Update();
 	for (auto& i : this->disk) i.Update();
-	for (auto& i : this->services) i.Update();
 }
 
 inline void ReplaceString(std::string& String1, const std::string& Old , const std::string& New) {
@@ -151,27 +129,19 @@ inline void reqproc(Res res, const std::function<void()>& process, const bool Ig
 template<typename T>
 inline auto find(std::vector<T>& v, const std::string& val) { return std::find_if(v.begin(), v.end(), [&val](const T& t) { return t.GetKey() == val; }); }
 
-inline auto GetTargetService(const httplib::Match& match, std::vector<ServiceMonitor>& services) {
-	const std::string matchstr = match[0].str();
-	std::string service = matchstr.substr(matchstr.find_last_of('/') + 1);
-	ReplaceString(service, "%20", " ");
-	return find(services, service);
-}
-
 ResourceAccessServer::ResourceAccessServer(const Service_CommandLineManager::CommandLineType& args)
 	: ServiceProcess(args), commgr(),
 	conf(BaseClass::ChangeFullPath(".\\server.xml")),
-	SCM(), query(), processor(this->query), memory(), disk(), network(), services(), server(),
+	query(), processor(this->query), memory(), disk(), network(), server(),
 	looptime(static_cast<DWORD>(this->GetConfInt("application", "looptime", 1000))) {
 	SvcStatus.dwControlsAccepted = SERVICE_ACCEPT_SHUTDOWN | SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_PAUSE_CONTINUE;
 	SetServiceStatusInfo();
 	this->GetDiskResourceInformations();
 	this->GetNetworkResourceInformations();
-	this->GetServiceInformations();
-	this->server.Get(this->GetConfStr("url", "all", "/v1/").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->AllResourceToObject()), "application/json"); }); });
-	this->server.Get(this->GetConfStr("url", "cpu", "/v1/cpu").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->processor.Get()), "application/json"); }); });
-	this->server.Get(this->GetConfStr("url", "memory", "/v1/mem").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->memory.Get()), "application/json"); }); });
-	this->server.Get(this->GetConfStr("url", "allstorage", "/v1/disk/").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->AllDiskResourceToObject()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "all", "/v1/").c_str(), [&](Req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->AllResourceToObject()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "cpu", "/v1/cpu").c_str(), [&](Req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->processor.Get()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "memory", "/v1/mem").c_str(), [&](Req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->memory.Get()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "allstorage", "/v1/disk/").c_str(), [&](Req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->AllDiskResourceToObject()), "application/json"); }); });
 	this->server.Get(this->GetConfStr("url", "storage", "/v1/disk/[A-Z]").c_str(),
 		[&](Req req, Res res) {
 			reqproc(res,
@@ -184,7 +154,7 @@ ResourceAccessServer::ResourceAccessServer(const Service_CommandLineManager::Com
 			);
 		}
 	);
-	this->server.Get(this->GetConfStr("url", "allnetwork", "/v1/network/").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->AllNetworkResourceToObject()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "allnetwork", "/v1/network/").c_str(), [&](Req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->AllNetworkResourceToObject()), "application/json"); }); });
 	this->server.Get(this->GetConfStr("url", "network", "/v1/network/eth[0-9]{1,}").c_str(), [&](Req req, Res res) {
 		reqproc(res,
 			[&] {
@@ -193,17 +163,6 @@ ResourceAccessServer::ResourceAccessServer(const Service_CommandLineManager::Com
 				else res.set_content(ToJsonText(this->network.at(pos).Get()), "application/json");
 			}
 		);
-		}
-	);
-	this->server.Get(this->GetConfStr("url", "allservice", "/v1/service/").c_str(), [&](Req req, Res res) { reqproc(res, [&] {res.set_content(ToJsonText(this->AllServiceToObject()), "application/json"); }); });
-	this->server.Get(this->GetConfStr("url", "service", "/v1/service/[0-9a-zA-Z\\-_.%]{1,}").c_str(),
-		[&](Req req, Res res) {
-			reqproc(res,
-				[&] {
-					if (auto it = GetTargetService(req.matches, this->services); it == this->services.end()) res.status = 404;
-					else res.set_content(ToJsonText(it->Get()), "application/json");
-				}
-			);
 		}
 	);
 }

@@ -109,9 +109,6 @@
     <ClCompile Include="Processor.cpp">
       <Filter>ServiceSession\ResourceManager</Filter>
     </ClCompile>
-    <ClCompile Include="ServiceMonitor.cpp">
-      <Filter>ServiceSession\ResourceManager</Filter>
-    </ClCompile>
     <ClCompile Include="ConsoleMainProcess.cpp">
       <Filter>ConsoleSession</Filter>
     </ClCompile>
@@ -190,9 +187,6 @@
       <Filter>ServiceSession\ResourceManager</Filter>
     </ClInclude>
     <ClInclude Include="Processor.hpp">
-      <Filter>ServiceSession\ResourceManager</Filter>
-    </ClInclude>
-    <ClInclude Include="ServiceMonitor.hpp">
       <Filter>ServiceSession\ResourceManager</Filter>
     </ClInclude>
     <ClInclude Include="ConsoleMainProcess.h">
