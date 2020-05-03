@@ -56,7 +56,6 @@ picojson::object ResourceAccessServer::AllResourceToObject() const {
 	JsonObject obj{};
 	JsonArray diskinfo{};
 	JsonArray netinfo{};
-	JsonArray serviceinfo{};
 	obj.insert("cpu", this->processor.Get());
 	obj.insert("memory", this->memory.Get());
 	InsertArray(this->disk, obj, "disk");
