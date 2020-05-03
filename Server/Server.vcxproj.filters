@@ -266,8 +266,5 @@
     <Xml Include="server.xml">
       <Filter>リソース ファイル</Filter>
     </Xml>
-    <Xml Include="auth.xml">
-      <Filter>リソース ファイル</Filter>
-    </Xml>
   </ItemGroup>
 </Project>

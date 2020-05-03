@@ -12,20 +12,6 @@
     <network>/v1/network/eth[0-9]{1,}</network>
     <allservice>/v1/service/</allservice>
     <service>/v1/service/[0-9a-zA-Z\-_.%]{1,}</service>
-    <svcctrl><!--未実装-->
-      <start>/v1/service/start/[0-9a-zA-Z\-_.%]{1,}</start>
-      <stop>/v1/service/stop/[0-9a-zA-Z\-_.%]{1,}</stop>
-      <pause>/v1/service/pause/[0-9a-zA-Z\-_.%]{1,}</pause>
-      <continue>/v1/service/continue/[0-9a-zA-Z\-_.%]{1,}</continue>
-    </svcctrl>
-    <stop>/v1/stop</stop>
-    <pause>/v1/pause</pause>
-    <continue>/v1/continue</continue>
-    <authoricate>
-      <createuser>/v1/newuser</createuser>
-      <signin>/v1/auth</signin><!--post-->
-      <signout>/v1/auth</signout><!--delete-->
-    </authoricate>
   </url>
   <system>
     <drives>C:,D:,E:</drives>
@@ -33,13 +19,6 @@
   </system>
   <application>
     <looptime>500</looptime>
-    <authfile>
-      <file>.\auth.xml</file>
-      <root>authinformation</root>
-      <defaultuser>defaultuser</defaultuser>
-      <allowuser>allowuser</allowuser>
-    </authfile>
-    <authmaxtime>0</authmaxtime>
   </application>
   <services>
     <target>IISADMIN,W3SVC,MySQL,postgresql-x64-12,wuauserv</target>
