@@ -231,8 +231,6 @@
     <ClCompile Include="..\Common\XmlDomElement.cpp" />
     <ClCompile Include="..\Common\XmlDomNodeList.cpp" />
     <ClCompile Include="..\Common\XmlDomText.cpp" />
-    <ClCompile Include="Auth.cpp" />
-    <ClCompile Include="Base64Converter.cpp" />
     <ClCompile Include="ComInitManager.cpp" />
     <ClCompile Include="Console.cpp" />
     <ClCompile Include="ConsoleMainProcess.cpp" />
@@ -253,8 +251,6 @@
     <ClCompile Include="ServiceControlManager.cpp" />
     <ClCompile Include="ServiceMainProcess.cpp" />
     <ClCompile Include="ServiceMonitor.cpp" />
-    <ClCompile Include="SHA512.cpp" />
-    <ClCompile Include="ToUpper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common\CommandLineManager.h" />
@@ -268,8 +264,6 @@
     <ClInclude Include="..\Common\XmlDomElement.hpp" />
     <ClInclude Include="..\Common\XmlDomNodeList.hpp" />
     <ClInclude Include="..\Common\XmlDomText.hpp" />
-    <ClInclude Include="Auth.hpp" />
-    <ClInclude Include="Base64Converter.hpp" />
     <ClInclude Include="ComInitManager.hpp" />
     <ClInclude Include="Console.h" />
     <ClInclude Include="ConsoleMainProcess.h" />
@@ -294,9 +288,7 @@
     <ClInclude Include="ServiceMainProcess.h" />
     <ClInclude Include="ServiceMonitor.hpp" />
     <ClInclude Include="ServiceStatus.h" />
-    <ClInclude Include="SHA512.hpp" />
     <ClInclude Include="Split.hpp" />
-    <ClInclude Include="ToUpper.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Xml Include="server.xml" />

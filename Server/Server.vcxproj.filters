@@ -29,9 +29,6 @@
     <Filter Include="ServiceSession\Others">
       <UniqueIdentifier>{9eb4b86e-775a-4cb7-8d16-452e59f4907b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ServiceSession\Auth">
-      <UniqueIdentifier>{e2b874f1-9b3d-4caf-925f-faba40a1bd5c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="ServiceSession\Config">
       <UniqueIdentifier>{d47ace3b-f15d-4de1-b67e-349a4e2a9100}</UniqueIdentifier>
     </Filter>
@@ -127,15 +124,6 @@
     <ClCompile Include="ResourceAccessServer.cpp">
       <Filter>ServiceSession\Core</Filter>
     </ClCompile>
-    <ClCompile Include="Auth.cpp">
-      <Filter>ServiceSession\Auth</Filter>
-    </ClCompile>
-    <ClCompile Include="SHA512.cpp">
-      <Filter>ServiceSession\Auth</Filter>
-    </ClCompile>
-    <ClCompile Include="ToUpper.cpp">
-      <Filter>ServiceSession\Auth</Filter>
-    </ClCompile>
     <ClCompile Include="ComInitManager.cpp">
       <Filter>ServiceSession\Config</Filter>
     </ClCompile>
@@ -159,9 +147,6 @@
     </ClCompile>
     <ClCompile Include="..\Common\ComString.cpp">
       <Filter>SubModule\ComString</Filter>
-    </ClCompile>
-    <ClCompile Include="Base64Converter.cpp">
-      <Filter>ServiceSession\Auth</Filter>
     </ClCompile>
     <ClCompile Include="..\Common\XmlDomText.cpp">
       <Filter>SubModule\MSXML\XmlDomText</Filter>
@@ -234,15 +219,6 @@
     <ClInclude Include="httplib.h">
       <Filter>ServiceSession\Others</Filter>
     </ClInclude>
-    <ClInclude Include="Auth.hpp">
-      <Filter>ServiceSession\Auth</Filter>
-    </ClInclude>
-    <ClInclude Include="SHA512.hpp">
-      <Filter>ServiceSession\Auth</Filter>
-    </ClInclude>
-    <ClInclude Include="ToUpper.hpp">
-      <Filter>ServiceSession\Auth</Filter>
-    </ClInclude>
     <ClInclude Include="ComInitManager.hpp">
       <Filter>ServiceSession\Config</Filter>
     </ClInclude>
@@ -281,9 +257,6 @@
     </ClInclude>
     <ClInclude Include="..\Common\ComString.hpp">
       <Filter>SubModule\ComString</Filter>
-    </ClInclude>
-    <ClInclude Include="Base64Converter.hpp">
-      <Filter>ServiceSession\Auth</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\XmlDomText.hpp">
       <Filter>SubModule\MSXML\XmlDomText</Filter>

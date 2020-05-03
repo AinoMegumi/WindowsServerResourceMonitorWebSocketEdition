@@ -1,5 +1,4 @@
 ﻿#include "ResourceAccessServer.hpp"
-#include "Base64Converter.hpp"
 #include "ServiceStatus.h"
 #include "Split.hpp"
 #include "JsonObject.hpp"
@@ -136,30 +135,14 @@ inline std::string ToJsonText(const picojson::object& obj) {
 	return ss.str();
 }
 
-inline std::string PickupAccessToken(Req req) {
-	const auto CookieIt = req.headers.find("Cookie");
-	if (CookieIt == req.headers.end()) return {};
-	const std::string CookieText = CookieIt->second;
-	return CookieText.substr(0, CookieText.find_first_of('=')) == "AccessToken"
-		? base64::decode(CookieText.substr(CookieText.find_first_of('=') + 1)) : std::string{};
-}
-
-inline void reqproc(AuthManager& auth, Req req, Res res, const std::function<void()>& process, const bool AuthUseAccessToken = true, const bool IgnoreServiceStatus = false) {
+inline void reqproc(Res res, const std::function<void()>& process, const bool IgnoreServiceStatus = false) {
 	if (!IgnoreServiceStatus && SvcStatus.dwCurrentState == SERVICE_PAUSED) {
 		res.status = 503;
 		res.set_content("service is paused", "text/plain");
 	}
 	else {
 		try {
-			if (AuthUseAccessToken) {
-				if (const std::string AccessToken = PickupAccessToken(req); AccessToken.empty()) throw AuthException(401, "AccessToken is not contained.");
-				else if (!auth.Auth(AccessToken)) throw AuthException(401, "Invalid AccessToken");
-			}
 			process();
-		}
-		catch (const AuthException& aex) {
-			res.status = aex.GetErrorCode();
-			res.set_content(aex.GetErrorMessage(), "text/plain");
 		}
 		catch (...) { res.status = 500; }
 	}
@@ -167,25 +150,6 @@ inline void reqproc(AuthManager& auth, Req req, Res res, const std::function<voi
 
 template<typename T>
 inline auto find(std::vector<T>& v, const std::string& val) { return std::find_if(v.begin(), v.end(), [&val](const T& t) { return t.GetKey() == val; }); }
-
-inline std::string Auth(AuthManager& auth, const std::string& RequestBody) {
-	picojson::value val{};
-	if (const std::string err = picojson::parse(val, RequestBody); !err.empty()) throw AuthException(400, "auth data is wrong");
-	picojson::object obj = val.get<picojson::object>();
-	const std::string id = obj.at("id").get<std::string>();
-	if (!auth.Auth(id, obj.at("pass").get<std::string>())) throw AuthException(401, "invalid ID or Password");
-	return auth.CreateAccessToken(id);
-}
-
-inline std::string CreateUser(AuthManager& auth, const std::string& RequestBody, const std::string& CurrentUserAccessToken) {
-	picojson::value val{};
-	if (const std::string err = picojson::parse(val, RequestBody); !err.empty()) throw AuthException(400, "auth data is wrong");
-	picojson::object obj = val.get<picojson::object>();
-	const std::string ID = obj.at("id").get<std::string>();
-	const std::string Pass = obj.at("pass").get<std::string>();
-	// 認証していたのがデフォルトユーザーの場合、新ユーザーのアクセストークンを発行して返す
-	return auth.AddUser(ID, Pass, CurrentUserAccessToken) ? auth.CreateAccessToken(ID) : CurrentUserAccessToken;
-}
 
 inline auto GetTargetService(const httplib::Match& match, std::vector<ServiceMonitor>& services) {
 	const std::string matchstr = match[0].str();
@@ -197,13 +161,6 @@ inline auto GetTargetService(const httplib::Match& match, std::vector<ServiceMon
 ResourceAccessServer::ResourceAccessServer(const Service_CommandLineManager::CommandLineType& args)
 	: ServiceProcess(args), commgr(),
 	conf(BaseClass::ChangeFullPath(".\\server.xml")),
-	auth(
-		string::converter::stl::from_bytes(BaseClass::ChangeFullPath(this->GetConfStr("application", "authfile/file", ".\\auth,xml"))),
-		this->GetConfStr(L"application", L"authfile/root", L"authinformation"),
-		this->GetConfStr(L"application", L"authfile/defaultuser", L"defaultuser"),
-		this->GetConfStr(L"application", L"authfile/allowuser", L"allowuser"),
-		this->GetConfInt("application", "authmaxtime", 0)
-	),
 	SCM(), query(), processor(this->query), memory(), disk(), network(), services(), server(),
 	looptime(static_cast<DWORD>(this->GetConfInt("application", "looptime", 1000))) {
 	SvcStatus.dwControlsAccepted = SERVICE_ACCEPT_SHUTDOWN | SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_PAUSE_CONTINUE;
@@ -211,13 +168,13 @@ ResourceAccessServer::ResourceAccessServer(const Service_CommandLineManager::Com
 	this->GetDiskResourceInformations();
 	this->GetNetworkResourceInformations();
 	this->GetServiceInformations();
-	this->server.Get(this->GetConfStr("url", "all", "/v1/").c_str(), [&](Req req, Res res) { reqproc(this->auth, req, res, [&] { res.set_content(ToJsonText(this->AllResourceToObject()), "application/json"); }); });
-	this->server.Get(this->GetConfStr("url", "cpu", "/v1/cpu").c_str(), [&](Req req, Res res) { reqproc(this->auth, req, res, [&] { res.set_content(ToJsonText(this->processor.Get()), "application/json"); }); });
-	this->server.Get(this->GetConfStr("url", "memory", "/v1/mem").c_str(), [&](Req req, Res res) { reqproc(this->auth, req, res, [&] { res.set_content(ToJsonText(this->memory.Get()), "application/json"); }); });
-	this->server.Get(this->GetConfStr("url", "allstorage", "/v1/disk/").c_str(), [&](Req req, Res res) { reqproc(this->auth, req, res, [&] { res.set_content(ToJsonText(this->AllDiskResourceToObject()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "all", "/v1/").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->AllResourceToObject()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "cpu", "/v1/cpu").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->processor.Get()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "memory", "/v1/mem").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->memory.Get()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "allstorage", "/v1/disk/").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->AllDiskResourceToObject()), "application/json"); }); });
 	this->server.Get(this->GetConfStr("url", "storage", "/v1/disk/[A-Z]").c_str(),
 		[&](Req req, Res res) {
-			reqproc(this->auth, req, res,
+			reqproc(res,
 				[&] {
 					const std::string matchstr = (req.matches[0].str() + ":"),
 						drive = matchstr.substr(matchstr.size() - 2);
@@ -227,9 +184,9 @@ ResourceAccessServer::ResourceAccessServer(const Service_CommandLineManager::Com
 			);
 		}
 	);
-	this->server.Get(this->GetConfStr("url", "allnetwork", "/v1/network/").c_str(), [&](Req req, Res res) { reqproc(this->auth, req, res, [&] { res.set_content(ToJsonText(this->AllNetworkResourceToObject()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "allnetwork", "/v1/network/").c_str(), [&](Req req, Res res) { reqproc(res, [&] { res.set_content(ToJsonText(this->AllNetworkResourceToObject()), "application/json"); }); });
 	this->server.Get(this->GetConfStr("url", "network", "/v1/network/eth[0-9]{1,}").c_str(), [&](Req req, Res res) {
-		reqproc(this->auth, req, res,
+		reqproc(res,
 			[&] {
 				const std::string matchstr = (req.matches[0].str());
 				if (const size_t pos = std::stoul(matchstr.substr(matchstr.find_last_of('/') + 4)); pos >= this->network.size()) res.status = 404;
@@ -238,10 +195,10 @@ ResourceAccessServer::ResourceAccessServer(const Service_CommandLineManager::Com
 		);
 		}
 	);
-	this->server.Get(this->GetConfStr("url", "allservice", "/v1/service/").c_str(), [&](Req req, Res res) { reqproc(this->auth, req, res, [&] {res.set_content(ToJsonText(this->AllServiceToObject()), "application/json"); }); });
+	this->server.Get(this->GetConfStr("url", "allservice", "/v1/service/").c_str(), [&](Req req, Res res) { reqproc(res, [&] {res.set_content(ToJsonText(this->AllServiceToObject()), "application/json"); }); });
 	this->server.Get(this->GetConfStr("url", "service", "/v1/service/[0-9a-zA-Z\\-_.%]{1,}").c_str(),
 		[&](Req req, Res res) {
-			reqproc(this->auth, req, res,
+			reqproc(res,
 				[&] {
 					if (auto it = GetTargetService(req.matches, this->services); it == this->services.end()) res.status = 404;
 					else res.set_content(ToJsonText(it->Get()), "application/json");
@@ -249,100 +206,6 @@ ResourceAccessServer::ResourceAccessServer(const Service_CommandLineManager::Com
 			);
 		}
 	);
-	this->server.Get(this->GetConfStr("url", "svcctrl/start", "/v1/service/start/[0-9a-zA-Z\-_.%]{1,}").c_str(),
-		[&](Req req, Res res) {
-			reqproc(this->auth, req, res,
-				[&] {
-					if (auto it = GetTargetService(req.matches, this->services); it == this->services.end()) res.status = 404;
-					else {
-						it->Run();
-						it->Update();
-						res.set_content(ToJsonText(it->Get()), "application/json");
-					}
-				}
-			);
-		}
-	);
-	this->server.Get(this->GetConfStr("url", "svcctrl/stop", "/v1/service/stop/[0-9a-zA-Z\-_.%]{1,}").c_str(),
-		[&](Req req, Res res) {
-			reqproc(this->auth, req, res,
-				[&] {
-					if (auto it = GetTargetService(req.matches, this->services); it == this->services.end()) res.status = 404;
-					else {
-						it->Stop();
-						it->Update();
-						res.set_content(ToJsonText(it->Get()), "application/json");
-					}
-				}
-			);
-		}
-	);
-	this->server.Get(this->GetConfStr("url", "svcctrl/pause", "/v1/service/pause/[0-9a-zA-Z\-_.%]{1,}").c_str(),
-		[&](Req req, Res res) {
-			reqproc(this->auth, req, res,
-				[&] {
-					if (auto it = GetTargetService(req.matches, this->services); it == this->services.end()) res.status = 404;
-					else {
-						it->Pause();
-						it->Update();
-						res.set_content(ToJsonText(it->Get()), "application/json");
-					}
-				}
-			);
-		}
-	);
-	this->server.Get(this->GetConfStr("url", "svcctrl/continue", "/v1/service/continue/[0-9a-zA-Z\-_.%]{1,}").c_str(),
-		[&](Req req, Res res) {
-			reqproc(this->auth, req, res,
-				[&] {
-					if (auto it = GetTargetService(req.matches, this->services); it == this->services.end()) res.status = 404;
-					else {
-						it->Continue();
-						it->Update();
-						res.set_content(ToJsonText(it->Get()), "application/json");
-					}
-				}
-			);
-		}
-	);
-	this->server.Post(this->GetConfStr("url", "stop", "/v1/stop").c_str(), [&](Req req, Res res) { reqproc(this->auth, req, res, [] { SvcStatus.dwCurrentState = SERVICE_STOP_PENDING; }); });
-	this->server.Post(this->GetConfStr("url", "pause", "/v1/pause").c_str(), [&](Req req, Res res) { reqproc(this->auth, req, res, [] { SvcStatus.dwCurrentState = SERVICE_PAUSE_PENDING; }); });
-	this->server.Post(this->GetConfStr("url", "continue", "/v1/continue").c_str(),
-		[&](Req req, Res res) {
-			reqproc(this->auth, req, res,
-				[&res] {
-					if (SvcStatus.dwCurrentState == SERVICE_PAUSED) SvcStatus.dwCurrentState = SERVICE_CONTINUE_PENDING;
-					else res.status = 400;
-				}, true, true
-			);
-		}
-	);
-	this->server.Post(this->GetConfStr("url", "authoricate/signin", "/v1/auth").c_str(),
-		[&](Req req, Res res) {
-			reqproc(this->auth, req, res, 
-				[&] {
-					const std::string AccessToken = Auth(this->auth, req.body);
-					res.set_header("Cookie", "AccessToken=" + AccessToken);
-				},
-				false
-			);
-		}
-	);
-	this->server.Post(this->GetConfStr("url", "authoricate/createuser", "/v1/newuser").c_str(),
-		[&](Req req, Res res) {
-			reqproc(this->auth, req, res,
-				[&] {
-					res.set_header("Cookie", "AccessToken=" + CreateUser(this->auth, req.body, PickupAccessToken(req)));
-				}
-			);
-		}
-	);
-	this->server.Delete(this->GetConfStr("url", "authoricate/signout", "/v1/auth").c_str(),
-		[&](Req req, Res res) {
-			reqproc(this->auth, req, res, [&] { this->auth.DeleteAccessToken(PickupAccessToken(req)); });
-		}
-	);
-
 }
 
 void ResourceAccessServer::Service_MainProcess() {
@@ -369,7 +232,6 @@ void ResourceAccessServer::Service_MainProcess() {
 						std::ofstream ofs(BaseClass::ChangeFullPath("log4.txt"));
 						ofs << er.what() << std::endl;
 					}
-					this->auth.DeleteExpiredAccessToken();
 					CountStart = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
 				}
 			);
